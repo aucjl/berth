@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Berth Utilization Gantt Chart</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            font-weight: 300;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .upload-section {
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 10px 20px rgba(116, 185, 255, 0.3);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-input-label {
+            display: inline-block;
+            padding: 15px 30px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px dashed rgba(255, 255, 255, 0.5);
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .file-input-label:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.8);
+            transform: translateY(-2px);
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        select {
+            padding: 12px 20px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            background: white;
+            color: #2c3e50;
+            min-width: 200px;
+            transition: all 0.3s ease;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #74b9ff;
+            box-shadow: 0 0 0 3px rgba(116, 185, 255, 0.2);
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: auto;
+            max-height: 80vh;
+        }
+
+        .gantt-chart {
+            position: relative;
+            min-width: 1200px;
+        }
+
+        .chart-header {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 10px;
+        }
+
+        .y-axis-label {
+            width: 250px;
+            font-weight: bold;
+            color: #2c3e50;
+            padding: 10px;
+        }
+
+        .time-header {
+            display: flex;
+            flex: 1;
+            background: linear-gradient(135deg, #a8e6cf, #88d8a3);
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        .day-column {
+            flex: 1;
+            text-align: center;
+            font-weight: bold;
+            color: #2c3e50;
+            padding: 5px;
+            border-right: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .day-column:last-child {
+            border-right: none;
+        }
+
+        .terminal-group {
+            margin-bottom: 20px;
+            border: 2px solid #ecf0f1;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .terminal-header {
+            background: linear-gradient(135deg, #fd79a8, #fdcb6e);
+            color: white;
+            padding: 15px;
+            font-weight: bold;
+            font-size: 18px;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .berth-row {
+            display: flex;
+            border-bottom: 1px solid #ecf0f1;
+            min-height: 60px;
+            align-items: center;
+        }
+
+        .berth-row:last-child {
+            border-bottom: none;
+        }
+
+        .berth-label {
+            width: 250px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-right: 2px solid #ecf0f1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .berth-name {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .berth-length {
+            color: #636e72;
+            font-size: 12px;
+        }
+
+        .berth-timeline {
+            flex: 1;
+            position: relative;
+            height: 60px;
+            background: #f8f9fa;
+        }
+
+        .time-slot {
+            position: absolute;
+            border-radius: 6px;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .time-slot:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .bound-east { background: linear-gradient(135deg, #ff6b6b, #ee5a24); }
+        .bound-west { background: linear-gradient(135deg, #4834d4, #6c5ce7); }
+        .bound-south { background: linear-gradient(135deg, #26de81, #20bf6b); }
+        .bound-north { background: linear-gradient(135deg, #fd9644, #f39c12); }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 1000;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #636e72;
+        }
+
+        .error {
+            background: #ff7675;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .success {
+            background: #00b894;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            select {
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚓ Berth Utilization Gantt Chart</h1>
+        
+        <div class="upload-section">
+            <div class="file-input-wrapper">
+                <input type="file" id="fileInput" class="file-input" accept=".xlsx,.xls" />
+                <label for="fileInput" class="file-input-label">
+                    📁 Choose Excel File
+                </label>
+            </div>
+            <div id="uploadStatus"></div>
+        </div>
+
+        <div class="controls">
+            <label for="portSelect">Select Port:</label>
+            <select id="portSelect">
+                <option value="">-- Select a Port --</option>
+            </select>
+        </div>
+
+        <div id="chartContainer" class="chart-container" style="display: none;">
+            <div id="ganttChart" class="gantt-chart"></div>
+        </div>
+
+        <div id="tooltip" class="tooltip" style="display: none;"></div>
+    </div>
+
+    <script>
+        let scheduleData = [];
+        let berthSetupData = [];
+        let currentWeekStart = null;
+
+        // Initialize the application
+        document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+        document.getElementById('portSelect').addEventListener('change', generateChart);
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('uploadStatus').innerHTML = '<div class="loading">📊 Processing Excel file...</div>';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // Read schedule data (first sheet)
+                    const scheduleSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    scheduleData = XLSX.utils.sheet_to_json(scheduleSheet);
+                    
+                    // Read berth setup data
+                    const berthSetupSheet = workbook.Sheets['berth setup'] || workbook.Sheets['Berth Setup'];
+                    if (berthSetupSheet) {
+                        berthSetupData = XLSX.utils.sheet_to_json(berthSetupSheet);
+                    }
+
+                    processData();
+                    document.getElementById('uploadStatus').innerHTML = '<div class="success">✅ File processed successfully!</div>';
+                    
+                } catch (error) {
+                    console.error('Error processing file:', error);
+                    document.getElementById('uploadStatus').innerHTML = '<div class="error">❌ Error processing file. Please check the format.</div>';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function processData() {
+            // Get unique ports
+            const ports = [...new Set(scheduleData.map(row => row.port))].filter(Boolean);
+            
+            const portSelect = document.getElementById('portSelect');
+            portSelect.innerHTML = '<option value="">-- Select a Port --</option>';
+            
+            ports.forEach(port => {
+                const option = document.createElement('option');
+                option.value = port;
+                option.textContent = port;
+                portSelect.appendChild(option);
+            });
+
+            // Process dates and set current week
+            processScheduleDates();
+        }
+
+        function processScheduleDates() {
+            scheduleData.forEach(row => {
+                if (row['berth day and time']) {
+                    const berthDateTime = parseDateTimeString(row['berth day and time']);
+                    const unberthDateTime = parseDateTimeString(row['unberth day and time']);
+                    
+                    row.berthDateTime = berthDateTime;
+                    row.unberthDateTime = unberthDateTime;
+                }
+            });
+
+            // Set current week start (Sunday)
+            const today = new Date();
+            const dayOfWeek = today.getDay();
+            currentWeekStart = new Date(today);
+            currentWeekStart.setDate(today.getDate() - dayOfWeek);
+            currentWeekStart.setHours(0, 0, 0, 0);
+        }
+
+        function parseDateTimeString(dateTimeStr) {
+            if (!dateTimeStr) return null;
+            
+            const parts = dateTimeStr.split(' - ');
+            if (parts.length !== 2) return null;
+            
+            const dayName = parts[0].trim();
+            const timeStr = parts[1].trim();
+            
+            const dayMap = {
+                'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+                'Thursday': 4, 'Friday': 5, 'Saturday': 6
+            };
+            
+            const dayIndex = dayMap[dayName];
+            if (dayIndex === undefined) return null;
+            
+            const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+            
+            const date = new Date(currentWeekStart);
+            date.setDate(currentWeekStart.getDate() + dayIndex);
+            date.setHours(hours, minutes, seconds || 0);
+            
+            return date;
+        }
+
+        function generateChart() {
+            const selectedPort = document.getElementById('portSelect').value;
+            if (!selectedPort) {
+                document.getElementById('chartContainer').style.display = 'none';
+                return;
+            }
+
+            // Filter data for selected port
+            const portSchedule = scheduleData.filter(row => row.port === selectedPort);
+            const portBerths = berthSetupData.filter(row => row.port === selectedPort);
+
+            // Group berths by terminal
+            const terminalGroups = {};
+            portBerths.forEach(berth => {
+                if (!terminalGroups[berth.terminal]) {
+                    terminalGroups[berth.terminal] = [];
+                }
+                terminalGroups[berth.terminal].push(berth);
+            });
+
+            // Generate chart
+            const chartContainer = document.getElementById('ganttChart');
+            chartContainer.innerHTML = '';
+
+            // Create header
+            createChartHeader(chartContainer);
+
+            // Create terminal groups
+            Object.keys(terminalGroups).forEach(terminal => {
+                createTerminalGroup(chartContainer, terminal, terminalGroups[terminal], portSchedule);
+            });
+
+            document.getElementById('chartContainer').style.display = 'block';
+        }
+
+        function createChartHeader(container) {
+            const header = document.createElement('div');
+            header.className = 'chart-header';
+
+            const yAxisLabel = document.createElement('div');
+            yAxisLabel.className = 'y-axis-label';
+            yAxisLabel.textContent = 'Terminals & Berths';
+
+            const timeHeader = document.createElement('div');
+            timeHeader.className = 'time-header';
+
+            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            days.forEach(day => {
+                const dayCol = document.createElement('div');
+                dayCol.className = 'day-column';
+                dayCol.textContent = day;
+                timeHeader.appendChild(dayCol);
+            });
+
+            header.appendChild(yAxisLabel);
+            header.appendChild(timeHeader);
+            container.appendChild(header);
+        }
+
+        function createTerminalGroup(container, terminalName, berths, schedule) {
+            const terminalGroup = document.createElement('div');
+            terminalGroup.className = 'terminal-group';
+
+            const terminalHeader = document.createElement('div');
+            terminalHeader.className = 'terminal-header';
+            terminalHeader.textContent = `🏢 ${terminalName}`;
+            terminalGroup.appendChild(terminalHeader);
+
+            berths.forEach(berth => {
+                createBerthRow(terminalGroup, berth, schedule);
+            });
+
+            container.appendChild(terminalGroup);
+        }
+
+        function createBerthRow(container, berth, schedule) {
+            const berthRow = document.createElement('div');
+            berthRow.className = 'berth-row';
+
+            const berthLabel = document.createElement('div');
+            berthLabel.className = 'berth-label';
+            
+            const berthName = document.createElement('div');
+            berthName.className = 'berth-name';
+            berthName.textContent = berth['berth name'] || 'Unknown Berth';
+            
+            const berthLength = document.createElement('div');
+            berthLength.className = 'berth-length';
+            berthLength.textContent = `${berth['berth length'] || 'N/A'}m`;
+            
+            berthLabel.appendChild(berthName);
+            berthLabel.appendChild(berthLength);
+
+            const berthTimeline = document.createElement('div');
+            berthTimeline.className = 'berth-timeline';
+
+            // Find schedules for this berth
+            const berthSchedules = schedule.filter(s => 
+                s['berth name'] === berth['berth name'] && 
+                s.berthDateTime && 
+                s.unberthDateTime
+            );
+
+            // Create time slots for each schedule
+            berthSchedules.forEach((sched, index) => {
+                createTimeSlot(berthTimeline, sched, berth, index);
+            });
+
+            berthRow.appendChild(berthLabel);
+            berthRow.appendChild(berthTimeline);
+            container.appendChild(berthRow);
+        }
+
+        function createTimeSlot(timeline, schedule, berth, slotIndex) {
+            const slot = document.createElement('div');
+            slot.className = 'time-slot';
+            
+            // Add bound-specific class
+            const bound = (schedule.bound || '').toLowerCase();
+            if (bound.includes('east')) slot.classList.add('bound-east');
+            else if (bound.includes('west')) slot.classList.add('bound-west');
+            else if (bound.includes('south')) slot.classList.add('bound-south');
+            else if (bound.includes('north')) slot.classList.add('bound-north');
+
+            // Calculate position and width
+            const weekStart = currentWeekStart.getTime();
+            const weekEnd = weekStart + (7 * 24 * 60 * 60 * 1000);
+            const berthTime = schedule.berthDateTime.getTime();
+            const unberthTime = schedule.unberthDateTime.getTime();
+
+            const leftPercent = ((berthTime - weekStart) / (weekEnd - weekStart)) * 100;
+            const widthPercent = ((unberthTime - berthTime) / (weekEnd - weekStart)) * 100;
+
+            slot.style.left = `${Math.max(0, leftPercent)}%`;
+            slot.style.width = `${Math.min(100 - leftPercent, widthPercent)}%`;
+            
+            // Adjust vertical position if multiple vessels
+            const verticalOffset = slotIndex * 25;
+            slot.style.top = `${10 + verticalOffset}%`;
+            slot.style.height = '20px';
+
+            // Set content
+            slot.textContent = `${schedule.service} (${schedule.bound})`;
+
+            // Add tooltip functionality
+            slot.addEventListener('mouseenter', (e) => showTooltip(e, schedule));
+            slot.addEventListener('mouseleave', hideTooltip);
+
+            timeline.appendChild(slot);
+        }
+
+        function showTooltip(event, schedule) {
+            const tooltip = document.getElementById('tooltip');
+            
+            const berthTime = schedule.berthDateTime ? schedule.berthDateTime.toLocaleString() : 'N/A';
+            const unberthTime = schedule.unberthDateTime ? schedule.unberthDateTime.toLocaleString() : 'N/A';
+            
+            tooltip.innerHTML = `
+                <strong>Service:</strong> ${schedule.service || 'N/A'}<br>
+                <strong>Bound:</strong> ${schedule.bound || 'N/A'}<br>
+                <strong>Berth:</strong> ${berthTime}<br>
+                <strong>Unberth:</strong> ${unberthTime}<br>
+                <strong>PF GCP:</strong> ${schedule['pf gcp'] || 'N/A'}
+            `;
+            
+            tooltip.style.display = 'block';
+            tooltip.style.left = event.pageX + 10 + 'px';
+            tooltip.style.top = event.pageY - 10 + 'px';
+        }
+
+        function hideTooltip() {
+            document.getElementById('tooltip').style.display = 'none';
+        }
+
+        // Handle tooltip movement
+        document.addEventListener('mousemove', (e) => {
+            const tooltip = document.getElementById('tooltip');
+            if (tooltip.style.display === 'block') {
+                tooltip.style.left = e.pageX + 10 + 'px';
+                tooltip.style.top = e.pageY - 10 + 'px';
+            }
+        });
+    </script>
+</body>
+</html>

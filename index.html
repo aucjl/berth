@@ -3,597 +3,962 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Berth Utilization Gantt Chart</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <title>Vessel Berthing Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #333;
         }
-
         .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            backdrop-filter: blur(10px);
+            /* max-width: 120vw; */
+            width: 100%;
+            max-width: none; /* override tailwind default max-width for mx auto */
+            margin-left: auto;
+            margin-right: auto;
+            overflow-x: hidden; /* Prevent horizontal scrolling */
+            background-color: #ffffff;
         }
 
-        h1 {
-            text-align: center;
-            color: #2c3e50;
-            margin-bottom: 30px;
-            font-size: 2.5em;
-            font-weight: 300;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        @media (min-width: 768px) { /* md breakpoint */
+            .container {
+                padding: 2rem; /* Equivalent to md:p-8 */
+            }
         }
 
-        .upload-section {
-            background: linear-gradient(135deg, #74b9ff, #0984e3);
-            padding: 30px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            text-align: center;
-            box-shadow: 0 10px 20px rgba(116, 185, 255, 0.3);
-        }
-
-        .file-input-wrapper {
+        /* Make the parent of canvas relative to position absolute children */
+        .chart-container-wrapper {
             position: relative;
-            display: inline-block;
+            width: 100%; /* Ensure it takes full width */
+            min-height: 600px; /* Minimum height for responsiveness */
+            overflow-y: scroll;
+            overflow-x: auto;
         }
-
-        .file-input {
-            display: none;
-        }
-
-        .file-input-label {
-            display: inline-block;
-            padding: 15px 30px;
-            background: rgba(255, 255, 255, 0.2);
-            border: 2px dashed rgba(255, 255, 255, 0.5);
-            border-radius: 10px;
-            color: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 16px;
-            font-weight: 500;
-        }
-
-        .file-input-label:hover {
-            background: rgba(255, 255, 255, 0.3);
-            border-color: rgba(255, 255, 255, 0.8);
-            transform: translateY(-2px);
-        }
-
-        .controls {
-            display: flex;
-            gap: 20px;
-            align-items: center;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-        }
-
-        select {
-            padding: 12px 20px;
-            border: 2px solid #ddd;
+        canvas {
+            display: block;
+            border: 1px solid #d1d5db;
+            background-color: #ffffff;
             border-radius: 8px;
-            font-size: 16px;
-            background: white;
-            color: #2c3e50;
-            min-width: 200px;
-            transition: all 0.3s ease;
+            box-shadow: 0 4px 4px 1px rgba(0, 0, 0, 0.1);
+            touch-action: none; /* Prevent browser touch actions like pull-to-refresh */
         }
-
-        select:focus {
-            outline: none;
-            border-color: #74b9ff;
-            box-shadow: 0 0 0 3px rgba(116, 185, 255, 0.2);
-        }
-
-        .chart-container {
-            background: white;
-            border-radius: 15px;
-            padding: 20px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            overflow: auto;
-            max-height: 80vh;
-        }
-
-        .gantt-chart {
-            position: relative;
-            min-width: 1200px;
-        }
-
-        .chart-header {
-            display: flex;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #ecf0f1;
-            padding-bottom: 10px;
-        }
-
-        .y-axis-label {
-            width: 250px;
-            font-weight: bold;
-            color: #2c3e50;
-            padding: 10px;
-        }
-
-        .time-header {
-            display: flex;
-            flex: 1;
-            background: linear-gradient(135deg, #a8e6cf, #88d8a3);
-            border-radius: 10px;
-            padding: 10px;
-        }
-
-        .day-column {
-            flex: 1;
-            text-align: center;
-            font-weight: bold;
-            color: #2c3e50;
-            padding: 5px;
-            border-right: 1px solid rgba(255, 255, 255, 0.3);
-        }
-
-        .day-column:last-child {
-            border-right: none;
-        }
-
-        .terminal-group {
-            margin-bottom: 20px;
-            border: 2px solid #ecf0f1;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        .terminal-header {
-            background: linear-gradient(135deg, #fd79a8, #fdcb6e);
-            color: white;
-            padding: 15px;
-            font-weight: bold;
-            font-size: 18px;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-        }
-
-        .berth-row {
-            display: flex;
-            border-bottom: 1px solid #ecf0f1;
-            min-height: 60px;
-            align-items: center;
-        }
-
-        .berth-row:last-child {
-            border-bottom: none;
-        }
-
-        .berth-label {
-            width: 250px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-right: 2px solid #ecf0f1;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .berth-name {
-            font-weight: 600;
-            color: #2c3e50;
-        }
-
-        .berth-length {
-            color: #636e72;
-            font-size: 12px;
-        }
-
-        .berth-timeline {
-            flex: 1;
-            position: relative;
-            height: 60px;
-            background: #f8f9fa;
-        }
-
-        .time-slot {
+        #vesselContainer {
             position: absolute;
-            border-radius: 6px;
-            color: white;
-            font-size: 12px;
-            font-weight: 600;
+            overflow: hidden; /* Clip vessel elements if they exceed their plotting area */
+        }
+        .vessel-rect {
+            position: absolute;
+            border: 0.5px solid #333;
+            border-radius: 4px; /* Rounded corners for vessel blocks */
+            box-sizing: border-box; /* Include padding and border in the element's total width and height */
+            cursor: pointer; /* Indicate interactivity */
+            transition: transform 0.1s ease-out; /* Smooth hover effect */
+            /* Debugging styles for visibility */
             display: flex;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+            color: white; /* Text color */
+            font-size: 9px; /* Small font for tight spaces */
+            font-weight: bold;
+            overflow: hidden; /* Hide overflowing text */
+            white-space: nowrap; /* Prevent text wrapping inside small boxes */
+            text-overflow: ellipsis; /* Show ellipsis for truncated text */
         }
-
-        .time-slot:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+        .vessel-rect:hover {
+            transform: scale(1.02); /* Slightly enlarge on hover */
+            z-index: 1; /* Bring hovered element to front */
         }
-
-        .bound-east { background: linear-gradient(135deg, #ff6b6b, #ee5a24); }
-        .bound-west { background: linear-gradient(135deg, #4834d4, #6c5ce7); }
-        .bound-south { background: linear-gradient(135deg, #26de81, #20bf6b); }
-        .bound-north { background: linear-gradient(135deg, #fd9644, #f39c12); }
-
-        .tooltip {
-            position: absolute;
-            background: rgba(0, 0, 0, 0.9);
+        #tooltip {
+            position: fixed; /* Use fixed for better positioning relative to viewport */
+            background-color: rgba(0, 0, 0, 0.85); /* Slightly darker, more opaque */
             color: white;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 14px;
-            z-index: 1000;
+            padding: 10px 12px; /* Increased padding */
+            border-radius: 6px; /* Slightly more rounded */
             pointer-events: none;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(10px);
-        }
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.1s;
+            z-index: 1000;
+            font-size: 0.9rem; /* Slightly smaller font */
+            line-height: 1.4;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); /* Add shadow for depth */
+            transform: translate(-50%, -10px); /* Adjust for cursor centering & slight offset */
+            white-space: nowrap; /* Prevent text wrapping */
+            font-family: 'Inter', sans-serif; /* Ensure Inter font for tooltip */
 
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #636e72;
         }
-
-        .error {
-            background: #ff7675;
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 10px 0;
+        #tooltip.active {
+            opacity: 1;
+            transform: translate(-50%, 0); /* Move up slightly on active */
         }
-
-        .success {
-            background: #00b894;
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 10px 0;
+        /* Custom scrollbar for better UX if needed, though aiming for no scroll */
+        ::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
         }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 20px;
-            }
-            
-            .controls {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            select {
-                min-width: auto;
-            }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>⚓ Berth Utilization Gantt Chart</h1>
-        
-        <div class="upload-section">
-            <div class="file-input-wrapper">
-                <input type="file" id="fileInput" class="file-input" accept=".xlsx,.xls" />
-                <label for="fileInput" class="file-input-label">
-                    📁 Choose Excel File
-                </label>
+<body class="p-4 md:p-8">
+    <div class="container bg-white rounded-lg shadow-xl p-6 md:p-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Vessel Berthing Visualizer</h1>
+
+        <div class="mb-6 flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4">
+            <div class="w-full md:w-1/3">
+                <label for="excelFile" class="block text-sm font-medium text-gray-700 mb-2">Upload Excel File:</label>
+                <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" class="block w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-full file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-indigo-50 file:text-indigo-700
+                    hover:file:bg-indigo-100 cursor-pointer rounded-md border border-gray-300">
             </div>
-            <div id="uploadStatus"></div>
+            <div class="w-full md:w-1/3">
+                <label for="portSelect" class="block text-sm font-medium text-gray-700 mb-2">Filter by Port:</label>
+                <select id="portSelect" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm">
+                    <option value="">Select a Port</option>
+                </select>
+            </div>
+            <div class="w-full md:w-1/3">
+                <label for="lineSelect" class="block text-sm font-medium text-gray-700 mb-2">Filter by Service Line:</label>
+                <select id="lineSelect" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm">
+                    <option value="All Services">All Services</option>
+
+                </select>
+
+            </div>
         </div>
 
-        <div class="controls">
-            <label for="portSelect">Select Port:</label>
-            <select id="portSelect">
-                <option value="">-- Select a Port --</option>
-            </select>
+        <div id="loadingIndicator" class="hidden text-center text-indigo-600 text-lg font-semibold mb-4">
+            Loading data... Please wait.
+        </div>
+        <div id="errorMessage" class="hidden text-center text-red-600 text-lg font-semibold mb-4">
+            Error: Unable to process file or data missing.
         </div>
 
-        <div id="chartContainer" class="chart-container" style="display: none;">
-            <div id="ganttChart" class="gantt-chart"></div>
+        <div class="chart-container-wrapper">
+            <canvas id="berthingChart" class="w-full h-auto"></canvas>
+            <div id="vesselContainer" class=""></div> <!-- New container for HTML vessel elements -->
+            <div id="tooltip" class="rounded-md"></div>
         </div>
-
-        <div id="tooltip" class="tooltip" style="display: none;"></div>
     </div>
 
-    <script>
-        let scheduleData = [];
+    <script type="module">
+        // Global variables for data and chart
+        let proformaData = [];
         let berthSetupData = [];
-        let currentWeekStart = null;
+        let allPorts = [];
+        let allLines = [];
+        let selectedPort = '';
+        let selectedLine = 'All Services'; // Default to all services
+        let filteredProforma;
 
-        // Initialize the application
-        document.getElementById('fileInput').addEventListener('change', handleFileUpload);
-        document.getElementById('portSelect').addEventListener('change', generateChart);
+        let canvas;
+        let ctx;
+        let chartWidth;
+        let chartHeight = 800; // Fixed height for the chart area, will adjust dynamically based on berths
+        let minChartHeight = 400; // Minimum height for the chart to ensure readability
 
-        function handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+        // Chart scaling constants
+        const WEEK_MILLISECONDS = 7 * 24 * 60 * 60 * 1000;
+        // Extending the chart to Monday 23:59:59 means it spans almost 9 full days.
+        // For simplicity and to cover the entire requested range, we'll make it 9 full days (Sunday 00:00 to next Tuesday 00:00).
+        const CHART_SPAN_MILLISECONDS = 9 * 24 * 60 * 60 * 1000;
+        const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
+        const HOUR_MILLISECONDS = 60 * 60 * 1000;
 
-            document.getElementById('uploadStatus').innerHTML = '<div class="loading">📊 Processing Excel file...</div>';
+        // Visual constants for chart layout and margins
+        const MARGIN = { top: 40, right: 20, bottom: 60, left: 150 }; // Increased left margin for berth names
+        const TIME_LABEL_HEIGHT = 20; // Height for the time labels (e.g., 06:00)
+        const DAY_LABEL_HEIGHT = 20; // Height for the weekday labels (e.g., Monday)
+        const HEADER_HEIGHT = TIME_LABEL_HEIGHT + DAY_LABEL_HEIGHT + 10; // Total height reserved for X-axis labels
+        const BERTH_LABEL_WIDTH = MARGIN.left - 10; // Width available for berth names on the Y-axis
+        const BERTH_LABEL_MARGIN_LEFT_OFFSET = 5;
 
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    
-                    // Read schedule data (first sheet)
-                    const scheduleSheet = workbook.Sheets[workbook.SheetNames[0]];
-                    scheduleData = XLSX.utils.sheet_to_json(scheduleSheet);
-                    
-                    // Read berth setup data
-                    const berthSetupSheet = workbook.Sheets['berth setup'] || workbook.Sheets['Berth Setup'];
-                    if (berthSetupSheet) {
-                        berthSetupData = XLSX.utils.sheet_to_json(berthSetupSheet);
-                    }
 
-                    processData();
-                    document.getElementById('uploadStatus').innerHTML = '<div class="success">✅ File processed successfully!</div>';
-                    
-                } catch (error) {
-                    console.error('Error processing file:', error);
-                    document.getElementById('uploadStatus').innerHTML = '<div class="error">❌ Error processing file. Please check the format.</div>';
-                }
-            };
-            reader.readAsArrayBuffer(file);
+        const BERTH_SEGMENT_PADDING = 0 //15; // Vertical padding between individual berth segments
+        const TERMINAL_HEADER_HEIGHT = 25; // Additional height for terminal labels
+
+        // Colors for drawing the chart elements
+        const GRID_COLOR = '#e0e0e0'; // Color for grid lines
+        const PERFORATED_LINE_COLOR = '#c0c0c0'; // Color for 6-hour perforated lines
+        const TEXT_COLOR = '#333'; // Color for all text labels
+
+        // To store unique colors for each 'Line' (service)
+        let colorMap = new Map();
+
+        // DOM Elements references
+        let excelFileInput;
+        let portSelect;
+        let lineSelect; 
+        let loadingIndicator;
+        let errorMessage;
+        let tooltip;
+        let vesselContainer;
+        let berthLayout;
+
+        // Initialize the application when the DOM is fully loaded
+        window.onload = initApp;
+
+        /**
+         * Initializes the application by getting DOM elements and setting up event listeners.
+         */
+        function initApp() {
+            canvas = document.getElementById('berthingChart');
+            ctx = canvas.getContext('2d');
+            excelFileInput = document.getElementById('excelFile');
+            portSelect = document.getElementById('portSelect');
+            lineSelect = document.getElementById('lineSelect'); 
+            loadingIndicator = document.getElementById('loadingIndicator');
+            errorMessage = document.getElementById('errorMessage');
+            tooltip = document.getElementById('tooltip');
+            vesselContainer = document.getElementById('vesselContainer'); // Get reference to new container
+
+            // Add event listeners for file upload and port selection
+            excelFileInput.addEventListener('change', handleFileUpload);
+            portSelect.addEventListener('change', handlePortChange);
+            lineSelect.addEventListener('change', handleLineChange);
+
+            // Initial canvas resize and add event listener for window resize
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
         }
 
-        function processData() {
-            // Get unique ports
-            const ports = [...new Set(scheduleData.map(row => row.port))].filter(Boolean);
-            
-            const portSelect = document.getElementById('portSelect');
-            portSelect.innerHTML = '<option value="">-- Select a Port --</option>';
-            
-            ports.forEach(port => {
+        /**
+         * Adjusts the canvas dimensions to match its container's width.
+         * The height is dynamically set in drawChart based on data.
+         */
+        function resizeCanvas() {
+            chartWidth = canvas.clientWidth;
+            canvas.width = chartWidth;
+            // chartHeight is dynamically set in drawChart based on content
+
+            // Redraw the chart if data is already loaded to ensure responsiveness
+            if (proformaData.length > 0 && berthSetupData.length > 0) {
+                drawChart();
+            } 
+        }
+
+        /**
+         * Handles the Excel file upload event.
+         * Reads the file, parses its content, and processes the data.
+         * @param {Event} event - The file input change event.
+         */
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                return; // No file selected
+            }
+
+            loadingIndicator.classList.remove('hidden'); // Show loading indicator
+            errorMessage.classList.add('hidden'); // Hide any previous error messages
+            clearChart(); // Clear any previously drawn chart content and HTML vessel elements
+
+            try {
+                const data = await file.arrayBuffer(); // Read file as ArrayBuffer
+                // Use XLSX library to read the workbook
+                const workbook = XLSX.read(data, { type: 'array' });
+
+                processData(workbook); // Process the parsed workbook data
+            } catch (error) {
+                console.error('Error reading Excel file:', error);
+                errorMessage.textContent = 'Error: Could not read Excel file. Please ensure it is a valid .xlsx, .xls, or .csv file.';
+                errorMessage.classList.remove('hidden'); // Show specific error message
+                // Reset data and dropdown in case of error
+                proformaData = [];
+                berthSetupData = [];
+                allPorts = [];
+                allLines = [];
+                portSelect.innerHTML = '<option value="">Select a Port</option>';
+                lineSelect.innerHTML = '<option value="All Services">All Services</option>';
+                selectedPort = '';
+                selectedLine = 'All Services';
+            } finally {
+                loadingIndicator.classList.add('hidden'); // Hide loading indicator
+            }
+        }
+
+        // Drop duplicates for matching line, terminal, berth, unberth
+        function dropDuplicatesByProperties(arr, properties) {
+            const seen = new Map();
+            return arr.filter(item => {
+                const key = properties.map(prop => item[prop]).join('|'); // Create a unique key from property values
+                if (!seen.has(key)) {
+                seen.set(key, item);
+                return true; // Keep the first occurrence
+                }
+                return false; // Discard subsequent duplicates
+            });
+        }
+
+        /**
+         * Processes the data from the parsed Excel workbook.
+         * Extracts data from "proforma raw" and "berth setup" sheets,
+         * populates the port filter dropdown, and triggers chart drawing.
+         * @param {Object} workbook - The parsed Excel workbook object.
+         */
+        function processData(workbook) {
+            // Convert sheets to JSON arrays
+            proformaData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]])
+            // Reconstruct berth setup based on same sheet
+            const allRows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]])
+            const seen = new Set();
+            berthSetupData = [];
+
+            for (const row of allRows) {
+                const port = row['Port'];
+                const terminal = row['Terminal'];
+                const berth = row['Berth Name'];
+                const length = parseFloat(row['Berth Length (m)']) || 100;
+                if (port && terminal && berth) {
+                    const key = `${port}|${terminal}|${berth}`;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        berthSetupData.push({
+                            Port: port,
+                            Terminal: terminal,
+                            'Berth Name': berth,
+                            'Berth Length (m)': length
+                        });
+                    }
+                }
+            }
+            console.log('Proforma data', proformaData)
+            console.log('Berth setup data', berthSetupData)
+
+            // Filter out PF where berth not fixed
+            proformaData = proformaData.filter(i=> i['Berth Name'] !== "no fixed berth")
+
+            // Remove duplicate pf calls
+            proformaData = dropDuplicatesByProperties(proformaData, ['Line', 'Terminal', 'Bound', 'Unberth Day - Time', 'Berth Day - Time'])
+
+            // Debugging logs for column headers and data samples
+            console.log('Parsed Proforma Data:', proformaData.slice(0, 5)); // Log first 5 rows
+            if (proformaData.length > 0) console.log('Proforma Column Headers:', Object.keys(proformaData[0]));
+            console.log('Parsed Berth Setup Data:', berthSetupData.slice(0, 5)); // Log first 5 rows
+            if (berthSetupData.length > 0) console.log('Berth Setup Column Headers:', Object.keys(berthSetupData[0]));
+
+
+            // Validate if data was extracted
+            if (proformaData.length === 0 || berthSetupData.length === 0) {
+                errorMessage.textContent = 'Error: One or both sheets are empty. Please check your Excel file. Ensure column headers match expected format.';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+
+            // Extract unique ports from the "berth setup" data -- thats also in proforma
+            allPorts = [...new Set(proformaData.map(row => row.Port))].sort().filter(a=> [...new Set(berthSetupData.map(row => row.Port))].sort().indexOf(a) >=0);
+
+            // Populate the port select dropdown with unique ports
+            portSelect.innerHTML = '<option value="">Select a Port</option>'; // Clear existing options
+            allPorts.forEach(port => {
                 const option = document.createElement('option');
                 option.value = port;
                 option.textContent = port;
                 portSelect.appendChild(option);
             });
 
-            // Process dates and set current week
-            processScheduleDates();
+            // Automatically select the first port if available and draw the chart
+            if (allPorts.length > 0) {
+                selectedPort = allPorts[0];
+                portSelect.value = selectedPort;
+
+                // Fill in dropdown for line
+                allLines = [...new Set(proformaData.filter(a=> a.Port == selectedPort).map(row => row.Line))].sort();
+                lineSelect.innerHTML = '<option value="All Services">All Services</option>'; // Default option
+                allLines.forEach(line => {
+                    const option = document.createElement('option');
+                    option.value = line;
+                    option.textContent = line;
+                    lineSelect.appendChild(option);
+                });
+                lineSelect.value = selectedLine;
+                drawChart();
+            } else {
+                errorMessage.textContent = 'No ports found in "berth setup" sheet. Please check the "Port" column.';
+                errorMessage.classList.remove('hidden');
+            }
         }
 
-        function processScheduleDates() {
-            scheduleData.forEach(row => {
-                if (row['berth day and time']) {
-                    const berthDateTime = parseDateTimeString(row['berth day and time']);
-                    const unberthDateTime = parseDateTimeString(row['unberth day and time']);
-                    
-                    row.berthDateTime = berthDateTime;
-                    row.unberthDateTime = unberthDateTime;
-                }
+        /**
+         * Handles the change event for the port filter dropdown.
+         * Updates the selected port and redraws the chart.
+         */
+        function handlePortChange() {
+            selectedPort = portSelect.value;
+            allLines = [...new Set(proformaData.filter(a=> a.Port == selectedPort).map(row => row.Line))].sort();
+            lineSelect.innerHTML = '<option value="All Services">All Services</option>'; // Default option
+            allLines.forEach(line => {
+                const option = document.createElement('option');
+                option.value = line;
+                option.textContent = line;
+                lineSelect.appendChild(option);
             });
-
-            // Set current week start (Sunday)
-            const today = new Date();
-            const dayOfWeek = today.getDay();
-            currentWeekStart = new Date(today);
-            currentWeekStart.setDate(today.getDate() - dayOfWeek);
-            currentWeekStart.setHours(0, 0, 0, 0);
+            drawChart();
         }
 
-        function parseDateTimeString(dateTimeStr) {
-            if (!dateTimeStr) return null;
-            
-            const parts = dateTimeStr.split(' - ');
-            if (parts.length !== 2) return null;
-            
+        function handleLineChange() {
+            selectedLine = lineSelect.value;
+            drawChart();
+        }
+
+        /**
+         * Clears the entire canvas and resets the HTML vessel elements.
+         */
+        function clearChart() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas drawings
+            vesselContainer.innerHTML = ''; // Clear HTML vessel elements
+            tooltip.classList.remove('active'); // Hide tooltip
+        }
+
+        /**
+         * Parses a "Day - Time" string (e.g., "Monday - 21:00:00") into a Date object,
+         * relative to a given reference Sunday for consistent weekly plotting.
+         * @param {string} dayTimeString - The string representation of day and time.
+         * @param {Date} referenceSunday - A Date object representing the start of the week (Sunday 00:00:00).
+         * @returns {Date|null} - The parsed Date object or null if parsing fails.
+         */
+        function parseDayTime(dayTimeString, referenceSunday) {
+            if (!dayTimeString) return null; // Handle undefined/null input
+
+            const parts = dayTimeString.split(' - ');
+            if (parts.length < 2) {
+                console.warn(`Invalid Day - Time format: ${dayTimeString}`);
+                return null;
+            }
+
             const dayName = parts[0].trim();
-            const timeStr = parts[1].trim();
-            
-            const dayMap = {
+            const timeString = parts[1].trim();
+
+            const daysOfWeek = {
                 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
                 'Thursday': 4, 'Friday': 5, 'Saturday': 6
             };
-            
-            const dayIndex = dayMap[dayName];
-            if (dayIndex === undefined) return null;
-            
-            const [hours, minutes, seconds] = timeStr.split(':').map(Number);
-            
-            const date = new Date(currentWeekStart);
-            date.setDate(currentWeekStart.getDate() + dayIndex);
-            date.setHours(hours, minutes, seconds || 0);
-            
-            return date;
+            const dayIndex = daysOfWeek[dayName];
+
+            if (dayIndex === undefined) {
+                console.warn(`Invalid day name: "${dayName}" in "${dayTimeString}"`);
+                return null;
+            }
+
+            const [hours, minutes, seconds] = timeString.split(':').map(Number);
+            if (isNaN(hours) || isNaN(minutes) || isNaN(seconds)) {
+                console.warn(`Invalid time string: "${timeString}" in "${dayTimeString}"`);
+                return null;
+            }
+
+            // Create a new Date object based on the reference Sunday and add the correct day and time
+            const dateTime = new Date(referenceSunday.getTime());
+            dateTime.setDate(referenceSunday.getDate() + dayIndex);
+            dateTime.setHours(hours, minutes, seconds, 0);
+
+            return dateTime;
         }
 
-        function generateChart() {
-            const selectedPort = document.getElementById('portSelect').value;
+        /**
+         * Generates a unique HSL color for a given line name (service).
+         * If the line name already has a color assigned, it returns the existing one.
+         * @param {string} lineName - The name of the service line.
+         * @returns {string} - The HSL color string (e.g., "hsl(120, 80%, 55%)").
+         */
+        function generateUniqueColor(lineName) {
+            if (!colorMap.has(lineName)) {
+                // Generate a random HSL color for better visual distinctiveness
+                const hue = Math.floor(Math.random() * 360); // Hue from 0 to 359
+                const saturation = 70 + Math.random() * 20; // Saturation between 70% and 90%
+                const lightness = 50 + Math.random() * 10;  // Lightness between 50% and 60%
+                colorMap.set(lineName, `hsl(${hue}, ${saturation}%, ${lightness}%)`);
+            }
+            return colorMap.get(lineName);
+        }
+
+        /**
+         * Finds the optimal vertical position for a new vessel within a berth segment,
+         * considering existing occupied time-space intervals to prevent overlaps and prioritize top placement.
+         * @param {Object} berthInfo - The berth's layout information, including verticalTracks.
+         * @param {Date} newVesselBerthTime - The berth time of the new vessel.
+         * @param {Date} newVesselUnberthTime - The unberth time of the new vessel.
+         * @param {number} rectHeight - The height of the new vessel's rectangle.
+         * @param {number} verticalGapPixels - The minimum vertical gap between vessels.
+         * @param {string} lineName - The name of the vessel's line for console warnings.
+         * @param {string} proformaBerthName - The name of the berth for console warnings.
+         * @returns {number} The chosen Y offset within the berth segment (relative to berth's yStart).
+         */
+        function findOptimalVerticalPosition(berthInfo, newVesselBerthTime, newVesselUnberthTime, rectHeight, verticalGapPixels, lineName, proformaBerthName) {
+            let chosenYOffsetWithinBerth = 0;
+            let foundPosition = false;
+
+            // Iterate through possible y-positions from top to bottom (earliest vessels at top)
+            // Start from 0 (top of berth), and iterate in 1-pixel increments for fine control.
+            // Loop up to (berthInfo.height - rectHeight) to ensure the vessel fits within the berth's vertical bounds.
+            for (let yCandidate = 0; yCandidate <= berthInfo.height - rectHeight; yCandidate += 1) { 
+                let overlaps = false;
+                const newVesselAbsoluteYStart = berthInfo.yStart + yCandidate;
+                const newVesselAbsoluteYEnd = newVesselAbsoluteYStart + rectHeight;
+
+                for (const occupied of berthInfo.verticalTracks) {
+                    // Check for temporal overlap: (new_start < occupied_end && occupied_start < new_end)
+                    const temporalOverlap = (newVesselBerthTime.getTime() < occupied.endTime && newVesselUnberthTime.getTime() > occupied.startTime);
+                    
+                    // Check for vertical overlap: (new_top < occupied_bottom && occupied_top < new_bottom)
+                    const verticalOverlap = (newVesselAbsoluteYStart < occupied.yEnd && newVesselAbsoluteYEnd > occupied.yStart);
+
+                    // If there's an overlap in both time AND space, this yCandidate position is not valid
+                    if (temporalOverlap && verticalOverlap) {
+                        overlaps = true;
+                        break; // Found an overlap, try next yCandidate
+                    }
+                }
+
+                if (!overlaps) {
+                    // Found a free slot!
+                    chosenYOffsetWithinBerth = yCandidate;
+                    foundPosition = true;
+                    break; // Take the first (topmost) available slot
+                }
+            }
+
+            if (!foundPosition) {
+                // Fallback: If no perfect slot was found (berth might be completely packed vertically for this time)
+                // This will stack it on top of the highest currently overlapping vessel, plus the gap.
+                let highestOccupiedYEndRelative = 0;
+                berthInfo.verticalTracks.forEach(interval => {
+                    // Only consider intervals that temporally overlap with the new vessel
+                    const temporalOverlap = (newVesselBerthTime.getTime() < interval.endTime && newVesselUnberthTime.getTime() > interval.startTime);
+                    if (temporalOverlap) {
+                        highestOccupiedYEndRelative = Math.max(highestOccupiedYEndRelative, interval.yEnd - berthInfo.yStart);
+                    }
+                });
+                chosenYOffsetWithinBerth = highestOccupiedYEndRelative + verticalGapPixels;
+
+                // Clamp to berth height if it overflows
+                if (chosenYOffsetWithinBerth + rectHeight > berthInfo.height) {
+                    chosenYOffsetWithinBerth = Math.max(0, berthInfo.height - rectHeight);
+                    console.warn(`Vessel for Line ${lineName} on berth ${proformaBerthName.toUpperCase()} clamped to berth bottom due to insufficient vertical space.`);
+                }
+            }
+
+            // After determining chosenYOffsetWithinBerth, add this new interval to the berth's occupied intervals
+            berthInfo.verticalTracks.push({
+                yStart: berthInfo.yStart + chosenYOffsetWithinBerth, // Absolute Y start of the vessel
+                yEnd: berthInfo.yStart + chosenYOffsetWithinBerth + rectHeight, // Absolute Y end of the vessel
+                startTime: newVesselBerthTime.getTime(),
+                endTime: newVesselUnberthTime.getTime()
+            });
+
+            return chosenYOffsetWithinBerth;
+        }
+
+
+        /**
+         * Main function to draw the berthing chart.
+         * It filters data, calculates layout, draws axes, and plots vessel calls as HTML elements.
+         */
+        function drawChart() {
+            clearChart(); // Clear the canvas and HTML vessel elements before redrawing
+
+            // Display a message if no port is selected
             if (!selectedPort) {
-                document.getElementById('chartContainer').style.display = 'none';
+                ctx.font = '20px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = TEXT_COLOR;
+                ctx.fillText('Please select a port to view the chart.', canvas.width / 2, canvas.height / 2);
                 return;
             }
 
-            // Filter data for selected port
-            const portSchedule = scheduleData.filter(row => row.port === selectedPort);
-            const portBerths = berthSetupData.filter(row => row.port === selectedPort);
-
-            // Group berths by terminal
-            const terminalGroups = {};
-            portBerths.forEach(berth => {
-                if (!terminalGroups[berth.terminal]) {
-                    terminalGroups[berth.terminal] = [];
-                }
-                terminalGroups[berth.terminal].push(berth);
-            });
-
-            // Generate chart
-            const chartContainer = document.getElementById('ganttChart');
-            chartContainer.innerHTML = '';
-
-            // Create header
-            createChartHeader(chartContainer);
-
-            // Create terminal groups
-            Object.keys(terminalGroups).forEach(terminal => {
-                createTerminalGroup(chartContainer, terminal, terminalGroups[terminal], portSchedule);
-            });
-
-            document.getElementById('chartContainer').style.display = 'block';
-        }
-
-        function createChartHeader(container) {
-            const header = document.createElement('div');
-            header.className = 'chart-header';
-
-            const yAxisLabel = document.createElement('div');
-            yAxisLabel.className = 'y-axis-label';
-            yAxisLabel.textContent = 'Terminals & Berths';
-
-            const timeHeader = document.createElement('div');
-            timeHeader.className = 'time-header';
-
-            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-            days.forEach(day => {
-                const dayCol = document.createElement('div');
-                dayCol.className = 'day-column';
-                dayCol.textContent = day;
-                timeHeader.appendChild(dayCol);
-            });
-
-            header.appendChild(yAxisLabel);
-            header.appendChild(timeHeader);
-            container.appendChild(header);
-        }
-
-        function createTerminalGroup(container, terminalName, berths, schedule) {
-            const terminalGroup = document.createElement('div');
-            terminalGroup.className = 'terminal-group';
-
-            const terminalHeader = document.createElement('div');
-            terminalHeader.className = 'terminal-header';
-            terminalHeader.textContent = `🏢 ${terminalName}`;
-            terminalGroup.appendChild(terminalHeader);
-
-            berths.forEach(berth => {
-                createBerthRow(terminalGroup, berth, schedule);
-            });
-
-            container.appendChild(terminalGroup);
-        }
-
-        function createBerthRow(container, berth, schedule) {
-            const berthRow = document.createElement('div');
-            berthRow.className = 'berth-row';
-
-            const berthLabel = document.createElement('div');
-            berthLabel.className = 'berth-label';
-            
-            const berthName = document.createElement('div');
-            berthName.className = 'berth-name';
-            berthName.textContent = berth['berth name'] || 'Unknown Berth';
-            
-            const berthLength = document.createElement('div');
-            berthLength.className = 'berth-length';
-            berthLength.textContent = `${berth['berth length'] || 'N/A'}m`;
-            
-            berthLabel.appendChild(berthName);
-            berthLabel.appendChild(berthLength);
-
-            const berthTimeline = document.createElement('div');
-            berthTimeline.className = 'berth-timeline';
-
-            // Find schedules for this berth
-            const berthSchedules = schedule.filter(s => 
-                s['berth name'] === berth['berth name'] && 
-                s.berthDateTime && 
-                s.unberthDateTime
-            );
-
-            // Create time slots for each schedule
-            berthSchedules.forEach((sched, index) => {
-                createTimeSlot(berthTimeline, sched, berth, index);
-            });
-
-            berthRow.appendChild(berthLabel);
-            berthRow.appendChild(berthTimeline);
-            container.appendChild(berthRow);
-        }
-
-        function createTimeSlot(timeline, schedule, berth, slotIndex) {
-            const slot = document.createElement('div');
-            slot.className = 'time-slot';
-            
-            // Add bound-specific class
-            const bound = (schedule.bound || '').toLowerCase();
-            if (bound.includes('east')) slot.classList.add('bound-east');
-            else if (bound.includes('west')) slot.classList.add('bound-west');
-            else if (bound.includes('south')) slot.classList.add('bound-south');
-            else if (bound.includes('north')) slot.classList.add('bound-north');
-
-            // Calculate position and width
-            const weekStart = currentWeekStart.getTime();
-            const weekEnd = weekStart + (7 * 24 * 60 * 60 * 1000);
-            const berthTime = schedule.berthDateTime.getTime();
-            const unberthTime = schedule.unberthDateTime.getTime();
-
-            const leftPercent = ((berthTime - weekStart) / (weekEnd - weekStart)) * 100;
-            const widthPercent = ((unberthTime - berthTime) / (weekEnd - weekStart)) * 100;
-
-            slot.style.left = `${Math.max(0, leftPercent)}%`;
-            slot.style.width = `${Math.min(100 - leftPercent, widthPercent)}%`;
-            
-            // Adjust vertical position if multiple vessels
-            const verticalOffset = slotIndex * 25;
-            slot.style.top = `${10 + verticalOffset}%`;
-            slot.style.height = '20px';
-
-            // Set content
-            slot.textContent = `${schedule.service} (${schedule.bound})`;
-
-            // Add tooltip functionality
-            slot.addEventListener('mouseenter', (e) => showTooltip(e, schedule));
-            slot.addEventListener('mouseleave', hideTooltip);
-
-            timeline.appendChild(slot);
-        }
-
-        function showTooltip(event, schedule) {
-            const tooltip = document.getElementById('tooltip');
-            
-            const berthTime = schedule.berthDateTime ? schedule.berthDateTime.toLocaleString() : 'N/A';
-            const unberthTime = schedule.unberthDateTime ? schedule.unberthDateTime.toLocaleString() : 'N/A';
-            
-            tooltip.innerHTML = `
-                <strong>Service:</strong> ${schedule.service || 'N/A'}<br>
-                <strong>Bound:</strong> ${schedule.bound || 'N/A'}<br>
-                <strong>Berth:</strong> ${berthTime}<br>
-                <strong>Unberth:</strong> ${unberthTime}<br>
-                <strong>PF GCP:</strong> ${schedule['pf gcp'] || 'N/A'}
-            `;
-            
-            tooltip.style.display = 'block';
-            tooltip.style.left = event.pageX + 10 + 'px';
-            tooltip.style.top = event.pageY - 10 + 'px';
-        }
-
-        function hideTooltip() {
-            document.getElementById('tooltip').style.display = 'none';
-        }
-
-        // Handle tooltip movement
-        document.addEventListener('mousemove', (e) => {
-            const tooltip = document.getElementById('tooltip');
-            if (tooltip.style.display === 'block') {
-                tooltip.style.left = e.pageX + 10 + 'px';
-                tooltip.style.top = e.pageY - 10 + 'px';
+            // Filter data based on the selected port
+            let filteredBerths = berthSetupData.filter(b => b.Port === selectedPort);
+            filteredProforma = proformaData.filter(p => p.Port === selectedPort);
+            if (lineSelect.value !== 'All Services') {
+                filteredProforma = filteredProforma.filter(p => p.Line === selectedLine);
             }
-        });
+            filteredBerths = filteredBerths.filter(i => [...new Set(filteredProforma.map(row => row['Berth Name'] + "-" + row.Terminal))].indexOf(i['Berth Name'] + "-" + i['Terminal']) >=0)
+            filteredBerths.push({
+                'Berth Length (m)' : 400,
+                'Berth Name' : "Anchorage",
+                'Port': selectedPort,
+                'Terminal': "Anchorage"
+            })
+            console.log("Filtered berth", filteredBerths)
+
+            // Display a message if no berth setup data is found for the selected port
+            if (filteredBerths.length === 0) {
+                ctx.font = '20px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = TEXT_COLOR;
+                ctx.fillText('No berth setup data found for this port. Please check your Excel data.', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+
+            // Calculate berth layout (Y-axis segmentation)
+            // Sort berths primarily by Terminal, then by Berth Name for consistent display
+            filteredBerths.sort((a, b) => {
+                if (b.Terminal === "Anchorage" && a.terminal !== "Anchorage") return -1;
+                if (a.Terminal === "Anchorage" && b.terminal !== "Anchorage") return 1;
+                if (a.Terminal < b.Terminal) return -1;
+                if (a.Terminal > b.Terminal) return 1;
+                // Use a consistent comparison for Berth Name after normalization
+                const nameA = (a['Berth Name'] || '').toString().trim().toLowerCase();
+                const nameB = (b['Berth Name'] || '').toString().trim().toLowerCase();
+                if (nameA < nameB) return -1;
+                if (nameA > nameB) return 1;
+                return 0;
+            });
+
+            // Group berths by terminal to create distinct visual blocks for each terminal
+            const berthsByTerminal = new Map();
+            filteredBerths.forEach(berth => {
+                if (!berthsByTerminal.has(berth.Terminal)) {
+                    berthsByTerminal.set(berth.Terminal, []);
+                }
+                berthsByTerminal.get(berth.Terminal).push(berth);
+            });
+
+            // X-axis: Time from Sunday to next Sunday
+            // Find the most recent past Sunday to use as a consistent reference point for parsing times
+            const now = new Date();
+            const referenceSunday = new Date(now);
+            referenceSunday.setDate(now.getDate() - now.getDay()); // Go back to Sunday (0=Sunday)
+            referenceSunday.setHours(0, 0, 0, 0); // Set to start of the day (00:00:00)
+
+            // Y-axis: Berth segmentation and layout calculation
+            let currentY = MARGIN.top + HEADER_HEIGHT; // Starting Y position for the first berth segment
+            berthLayout = []; // Stores calculated { BerthName, Terminal, yStart, yEnd, height, originalLength, verticalTracks }
+
+            // Determine the maximum LOA for proper scaling of vessel rectangle heights
+            const maxLOA = Math.max(...filteredProforma.map(p => p['Avg LOA (m)'] || 0), 1); // Default to 1 to avoid division by zero
+            let terminalHeaders = []
+            
+            // Iterate through terminals and their berths to calculate vertical layout
+            console.log("Berths by terminal", berthsByTerminal.entries())
+            for (const [terminal, berthsInTerminal] of berthsByTerminal.entries()) {
+                terminalHeaders.push({
+                    terminal: terminal,
+                    y: currentY + TERMINAL_HEADER_HEIGHT - 5
+                });
+
+                // Add space and label for the terminal header
+                currentY += TERMINAL_HEADER_HEIGHT; // Space for terminal label
+                ctx.font = 'bold 14px Inter';
+                ctx.fillStyle = TEXT_COLOR;
+                ctx.textAlign = 'right';
+                ctx.fillText(`Terminal: ${terminal}`, MARGIN.left+5, currentY - 5); // Terminal label within chart area
+                currentY += 5; // Small padding after terminal header
+
+                berthsInTerminal.forEach(berth => {
+                    const berthName = berth['Berth Name']; // This is the berth name from berth setup
+                    const berthLength = berth['Berth Length (m)'];
+                    const berthSegmentHeight = 50 + (berthLength / 100) * 10; // Base height 50px + 10px per 100m length
+                    const yStart = currentY;
+                    const yEnd = yStart + berthSegmentHeight;
+
+                    berthLayout.push({
+                        berthName: (berthName || '').toString(),//.trim().toLowerCase(), // Normalize for matching
+                        terminal: berth.Terminal, // Use original casing for display
+                        yStart: yStart,
+                        yEnd: yEnd,
+                        height: berthSegmentHeight,
+                        originalLength: berthLength,
+                        verticalTracks: [] // Initialise vertical tracks for this berth
+                    });
+                    currentY = yEnd + BERTH_SEGMENT_PADDING; // Add padding between berths
+                });
+            }
+
+            // Dynamic Chart Height Calculation (accounting for berth length)
+            let totalBerthSegmentHeight = 0;
+            berthLayout.forEach(berth => {
+                totalBerthSegmentHeight += berth.height + BERTH_SEGMENT_PADDING +1;
+            });
+            const totalTerminalHeaderHeight = berthsByTerminal.size * TERMINAL_HEADER_HEIGHT;
+            chartHeight = Math.max(minChartHeight, totalBerthSegmentHeight + totalTerminalHeaderHeight + MARGIN.top + MARGIN.bottom);
+            canvas.height = chartHeight; // Set the canvas height dynamically
+
+            const chartAreaWidth = chartWidth - MARGIN.left - MARGIN.right;
+            const chartAreaHeight = chartHeight - MARGIN.top - MARGIN.bottom - HEADER_HEIGHT; // Actual drawing area for time and berths
+
+            // Set vesselContainer size and position to exactly match the plotting area of the canvas
+            vesselContainer.style.left = `${MARGIN.left}px`;
+            vesselContainer.style.top = `${MARGIN.top + HEADER_HEIGHT}px`;
+            vesselContainer.style.width = `${chartAreaWidth}px`;
+            vesselContainer.style.height = `${chartAreaHeight}px`;
+
+            // NOW draw terminal headers after canvas is properly sized
+            ctx.font = 'bold 14px Inter';
+            ctx.fillStyle = TEXT_COLOR;
+            ctx.textAlign = 'left';
+            terminalHeaders.forEach(header => {
+                ctx.fillText(`Terminal: ${header.terminal}`, MARGIN.left + 5, header.y);
+            });
+
+            // Draw Y-axis (Berth Names and horizontal lines)
+            ctx.font = '12px Inter';
+            ctx.fillStyle = TEXT_COLOR;
+            ctx.textAlign = 'left';
+            berthLayout.forEach(berth => {
+                // y-axis berth name prints here
+                ctx.fillText(
+                    `${berth.berthName} (${berth.originalLength}m)`,
+                    // BERTH_LABEL_WIDTH,
+                    BERTH_LABEL_MARGIN_LEFT_OFFSET+30,
+                    berth.yStart + berth.height / 2 + 5 // Center text vertically within its segment
+                );
+                // Draw horizontal line for the top of each berth segment
+                ctx.beginPath();
+                ctx.moveTo(MARGIN.left, berth.yStart);
+                ctx.lineTo(chartWidth - MARGIN.right, berth.yStart);
+                ctx.strokeStyle = GRID_COLOR;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            });
+            // Draw the final horizontal line at the bottom of the last berth
+            if (berthLayout.length > 0) {
+                 ctx.beginPath();
+                ctx.moveTo(MARGIN.left, berthLayout[berthLayout.length - 1].yEnd);
+                ctx.lineTo(chartWidth - MARGIN.right, berthLayout[berthLayout.length - 1].yEnd);
+                ctx.strokeStyle = GRID_COLOR;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+
+
+            // Draw X-axis (Time Grid & Labels)
+            const daysOfWeekNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const pixelsPerMillisecond = chartAreaWidth / CHART_SPAN_MILLISECONDS; // Pixels representing one millisecond
+
+            ctx.textAlign = 'center';
+            ctx.font = '10px Inter'; // Smaller font for time labels
+
+            for (let i = 0; i < 9; i++) { // Loop for 9 days (Sunday, Monday, ..., Next Monday)
+                const currentDayDate = new Date(referenceSunday.getTime() + (i * DAY_MILLISECONDS));
+                const dayName = daysOfWeekNames[currentDayDate.getDay()]; // Get correct day name for each iteration
+                const dayStartMillis = i * DAY_MILLISECONDS;
+                const dayStartX = MARGIN.left + (dayStartMillis * pixelsPerMillisecond);
+                const dayEndX = MARGIN.left + ((i + 1) * DAY_MILLISECONDS * pixelsPerMillisecond);
+                
+                // Draw day label (e.g., "Monday")
+                ctx.fillStyle = TEXT_COLOR;
+                ctx.fillText(dayName, dayStartX + (dayEndX - dayStartX) / 2, MARGIN.top + TIME_LABEL_HEIGHT + 5);
+
+                // Draw perforated lines for 06:00, 12:00, 18:00 within each day
+                for (let h = 0; h < 24; h += 6) {
+                    const timeMillis = dayStartMillis + (h * HOUR_MILLISECONDS);
+                    const x = MARGIN.left + (timeMillis * pixelsPerMillisecond);
+
+                    // Draw perforated line
+                    ctx.beginPath();
+                    ctx.setLineDash([2, 2]); // Set line style to perforated (2px solid, 2px gap)
+                    ctx.moveTo(x, MARGIN.top + HEADER_HEIGHT); // Start line below header
+                    ctx.lineTo(x, chartHeight - MARGIN.bottom); // End line above bottom margin
+                    ctx.strokeStyle = PERFORATED_LINE_COLOR;
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+                    ctx.setLineDash([]); // Reset line dash to solid for subsequent drawings
+
+                    // Draw time labels at the top (e.g., "06:00")
+                    if (h < 24) { // Avoid labeling 24:00 (it's 00:00 of the next day)
+                        ctx.fillStyle = TEXT_COLOR;
+                        ctx.fillText(`${String(h).padStart(2, '0')}:00`, x, MARGIN.top + 10);
+                    }
+                }
+                // Draw a solid line for the day boundary (end of day / start of next day)
+                ctx.beginPath();
+                ctx.moveTo(dayEndX, MARGIN.top + HEADER_HEIGHT);
+                ctx.lineTo(dayEndX, chartHeight - MARGIN.bottom);
+                ctx.strokeStyle = GRID_COLOR;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+
+            // Draw a border around the main chart plotting area (this is for the canvas)
+            ctx.strokeStyle = GRID_COLOR;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(MARGIN.left, MARGIN.top + HEADER_HEIGHT, chartAreaWidth, chartAreaHeight);
+
+            // Plot service calls as HTML rectangles
+
+            /**
+             * Draws vessel rectangles as HTML div elements for interactive display.
+            */
+            vesselContainer.innerHTML = ''; // Clear previous HTML elements
+            // Sort proforma data by berth time to ensure consistent vertical stacking
+            filteredProforma.sort((a, b) => {
+                const berthTimeA = parseDayTime(a['Day - Time'], referenceSunday)?.getTime() || 0;
+                const berthTimeB = parseDayTime(b['Day - Time'], referenceSunday)?.getTime() || 0;
+                return berthTimeA - berthTimeB;
+            });
+
+            filteredProforma.forEach(call => {
+                const proformaBerthName = (call['Berth Name'] || '').toString()//.trim().toLowerCase(); // Normalize for matching
+                const proformaTerminal = (call['Terminal'] || '').toString()
+                const lineName = call.Line;
+                const avgLoa = call['Avg LOA (m)'];
+
+                // Find the corresponding berth's layout information (y-position, height)
+                const berthInfo = berthLayout.find(b => b.berthName === proformaBerthName && b.terminal=== proformaTerminal);
+
+                if (berthInfo) {
+                    // Parse berth and unberth times relative to the consistent reference Sunday
+                    const unberthTime = parseDayTime(call['Unberth Day - Time'], referenceSunday);
+                    const berthTime = parseDayTime(call['Berth Day - Time'], referenceSunday);
+
+                    if (!berthTime || !unberthTime) {
+                        console.warn(`Skipping call due to invalid time format or parsing error: ${JSON.stringify(call)}`)
+                        return; // Skip this call if time parsing fails
+                    }
+
+                    // Calculate duration in milliseconds. Handle cases where unberth time wraps to the next week.
+                    let durationMillis = unberthTime.getTime() - berthTime.getTime();
+                    // If duration is negative (e.g., starts Sat, ends Mon), assume it wraps to the next week
+                    if (durationMillis < 0) {
+                        durationMillis += WEEK_MILLISECONDS; // If unberth is before berth (in the same week context), add a full week
+                    }
+
+                    // Calculate the X-position (start time) and width (duration) of the rectangle relative to the canvas
+                    const rectXCanvas = MARGIN.left + ((berthTime.getTime() - referenceSunday.getTime()) * pixelsPerMillisecond);
+                    const rectWidth = durationMillis * pixelsPerMillisecond;
+
+                    // Calculate rectangle height based on LOA, scaled within the berth segment's allocated height 
+                    // FIXED - Make vessel length proportional to berth length
+                    const vesselHeight = (avgLoa / berthInfo.originalLength) * berthInfo.height
+                    // Ensure a minimum height for visibility, even for very small vessels
+                    const rectHeight = Math.max(vesselHeight, 5);
+
+                    // --- NEW LOGIC FOR VERTICAL SPACING ---
+                    const verticalGapPixels = (20 / berthInfo.originalLength) * berthInfo.height // Gap of 20m proportion of berth segment height
+
+                    let chosenYOffsetWithinBerth = findOptimalVerticalPosition(
+                        berthInfo, berthTime, unberthTime, rectHeight, verticalGapPixels, lineName, proformaBerthName
+                    );
+
+                    // let chosenYOffsetWithinBerth = 0; // Relative to berthInfo.yStart
+                    // let assignedToExistingTrack = false;
+
+                    // // Sort tracks by their `yEndOffset` to prioritize filling higher (earlier) slots
+                    // berthInfo.verticalTracks.sort((a, b) => a.yEndOffset - b.yEndOffset);
+
+                    // // Try to find an existing vertical track where this vessel can fit
+                    // for (let i = 0; i < berthInfo.verticalTracks.length; i++) {
+                    //     const track = berthInfo.verticalTracks[i];
+                    //     // If this track is free by the vessel's start time
+                    //     // And the vessel would fit vertically *after* the previous occupant in this track, plus the gap
+                    //     const potentialYStartInTrack = track.yEndOffset + verticalGapPixels;
+                    //     if (berthTime.getTime() >= track.freeAt && (potentialYStartInTrack + rectHeight <= berthInfo.height)) {
+                    //         chosenYOffsetWithinBerth = potentialYStartInTrack;
+                    //         track.freeAt = unberthTime.getTime(); // Update this track's free time
+                    //         track.yEndOffset = chosenYOffsetWithinBerth + rectHeight; // Update its vertical end
+                    //         assignedToExistingTrack = true;
+                    //         break; // Found a suitable track
+                    //     }
+                    // }
+
+                    // if (!assignedToExistingTrack) {
+                    //     // If no suitable existing track was found, create a new one.
+                    //     // Calculate the starting Y for the new track by finding the highest
+                    //     // currently occupied vertical position among overlapping tracks, plus the gap.
+                    //     let highestOccupiedYEnd = 0;
+                    //     berthInfo.verticalTracks.forEach(track => {
+                    //         // Only consider tracks that are currently in use or will be used soon when this vessel arrives
+                    //         if (berthTime.getTime() < track.freeAt) {
+                    //             highestOccupiedYEnd = Math.max(highestOccupiedYEnd, track.yEndOffset);
+                    //         }
+                    //     });
+
+                    //     chosenYOffsetWithinBerth = highestOccupiedYEnd + verticalGapPixels;
+
+                    //     // If this new position overflows the berth's height, clamp it to the bottom.
+                    //     // This prevents it from being drawn completely outside, but might visually squash it.
+                    //     if (chosenYOffsetWithinBerth + rectHeight > berthInfo.height) {
+                    //         chosenYOffsetWithinBerth = Math.max(0, berthInfo.height - rectHeight);
+                    //         console.warn(`Vessel for Line ${lineName} on berth ${proformaBerthName} clamped to berth bottom due to insufficient vertical space.`);
+                    //     }
+
+                    //     // Add a new track entry for this vessel
+                    //     berthInfo.verticalTracks.push({
+                    //         yEndOffset: chosenYOffsetWithinBerth + rectHeight,
+                    //         freeAt: unberthTime.getTime()
+                    //     });
+                    // }
+
+                    // Positions relative to the #vesselContainer
+                    const rectXRelative = rectXCanvas - MARGIN.left;
+                    const rectYRelative = (berthInfo.yStart - (MARGIN.top + HEADER_HEIGHT)) + chosenYOffsetWithinBerth;
+
+                    const fillColor = generateUniqueColor(lineName); // Get unique color for this service line
+
+                    // Create the HTML div element for the vessel call
+                    const vesselDiv = document.createElement('div');
+                    vesselDiv.classList.add('vessel-rect');
+                    vesselDiv.style.left = `${rectXRelative}px`;
+                    vesselDiv.style.top = `${rectYRelative}px`;
+                    vesselDiv.style.width = `${rectWidth}px`;
+                    vesselDiv.style.height = `${rectHeight}px`;
+                    vesselDiv.style.backgroundColor = fillColor;
+                    vesselDiv.textContent = `${lineName || ''} (${call['Bound']})`; // Display Line name inside the rect for debugging visibility
+
+                    // Store data attributes for easy retrieval on hover
+                    // Normalize keys for data attributes
+                    for (const key in call) {
+                        if (Object.prototype.hasOwnProperty.call(call, key)) {
+                            // Convert string keys like "Avg LOA (m)" to camelCase "avgLoaM"
+                            const dataKey = key.replace(/[^a-zA-Z0-9]+(.)?/g, (match, chr) => chr ? chr.toUpperCase() : '').replace(/^./, (match) => match.toLowerCase());
+                            vesselDiv.dataset[dataKey] = call[key];
+                        }
+                    }
+
+                    // Add event listeners for hover directly on the HTML div
+                    vesselDiv.addEventListener('mouseover', (e) => showTooltip(e, call));
+                    vesselDiv.addEventListener('mouseout', hideTooltip);
+
+                    vesselContainer.appendChild(vesselDiv); // Append to the new container
+                } else {
+                    console.warn(`No berth info found for berth name: "${proformaBerthName}" in proforma data. Call: ${JSON.stringify(call)}`);
+                }
+            });
+        }
+
+        /**
+         * Displays the tooltip with detailed information about a hovered vessel call.
+         * @param {MouseEvent} event - The mouse event.
+         * @param {Object} d - The data object for the vessel call.
+         */
+        function showTooltip(event, d) {
+            tooltip.classList.add('active');
+            // Position the tooltip relative to the mouse cursor
+            tooltip.style.left = `${event.clientX}px`;
+            tooltip.style.top = `${event.clientY}px`;
+
+            // Populate tooltip with detailed information
+            tooltip.innerHTML = `
+                <strong>Line:</strong> ${d.Line || 'N/A'} (${d.Bound})<br>
+                <strong>Port:</strong> ${d.Port || 'N/A'}<br>
+                <strong>Terminal:</strong> ${d.Terminal || 'N/A'}<br>
+                <strong>Berth Name:</strong> ${d["Berth Name"] || 'N/A'}<br>
+                <strong>Berth:</strong> ${d['Berth Day - Time'] || 'N/A'}<br>
+                <strong>Unberth:</strong> ${d['Unberth Day - Time'] || 'N/A'}<br>
+                <strong>Berth Duration:</strong> ${d['Berth Duration'] || 'N/A'}<br>
+                <strong>Avg LOA (m):</strong> ${d['Avg LOA (m)'] || 'N/A'}<br>
+                <strong>PF GCP (mvs/hr):</strong> ${d['PF GCP (mvs/hr)'] || 'N/A'}<br>
+                <strong>Assigned Berth Length:</strong> ${d['Berth Length (m)'] || 'N/A'}
+            `;
+        }
+
+        /**
+         * Hides the tooltip.
+         */
+        function hideTooltip() {
+            tooltip.classList.remove('active');
+        }
     </script>
 </body>
 </html>
